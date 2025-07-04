@@ -1,0 +1,186 @@
+{% extends "management/base.html" %}
+
+{% block title %}إدارة أسعار الشحن{% endblock %}
+
+{% block content %}
+<div id="shipping-app">
+    <!-- هذا العنصر الخفي ضروري لتوفير رمز الأمان للـ JavaScript -->
+    <div style="display:none;">{% csrf_token %}</div>
+
+    <!-- قسم التحليل -->
+    <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+        <h1 class="text-2xl md:text-3xl font-bold text-gray-800">تحليل قائمة أسعار الشحن</h1>
+        <p class="text-gray-600 mt-1 mb-4">ارفع صورة أو ملف PDF يحتوي على قائمة أسعار، وسيقوم النظام بتحليلها تلقائيًا.</p>
+        <div class="flex items-center space-x-2 space-x-reverse">
+            <input type="file" id="file-input" accept="image/*,.pdf" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+            <button id="analyze-btn" class="bg-blue-600 text-white font-bold py-2 px-5 rounded-lg whitespace-nowrap flex items-center justify-center w-36" disabled>
+                <span class="button-text">تحليل الملف</span>
+                <div class="spinner hidden"><div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div></div>
+            </button>
+        </div>
+    </div>
+
+    <!-- قسم التنبيهات -->
+    <div id="alert-container"></div>
+
+    <!-- قسم قائمة الأسعار -->
+    <div class="bg-white rounded-xl shadow-lg">
+        <div class="p-4 flex justify-between items-center bg-gray-50 border-b rounded-t-xl">
+            <h2 class="text-xl font-bold text-gray-800">قائمة الأسعار</h2>
+            <button id="save-all-btn" class="bg-green-600 text-white font-bold py-2 px-5 rounded-lg flex items-center justify-center w-44">
+                <span class="button-text">حفظ كل التغييرات</span>
+                <div class="spinner hidden"><div class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div></div>
+            </button>
+        </div>
+        <div id="table-container" class="overflow-x-auto">
+            <!-- سيتم بناء الجدول هنا -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const app = document.getElementById('shipping-app');
+    const tableContainer = document.getElementById('table-container');
+    const alertContainer = document.getElementById('alert-container');
+    const analyzeBtn = document.getElementById('analyze-btn');
+    const saveAllBtn = document.getElementById('save-all-btn');
+    const fileInput = document.getElementById('file-input');
+
+    const getCsrfToken = () => document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+    const showAlert = (message, type = 'error') => {
+        const color = type === 'success' ? 'green' : 'red';
+        alertContainer.innerHTML = `<div class="p-4 mb-4 text-sm text-${color}-700 bg-${color}-100 rounded-lg" role="alert">${message}</div>`;
+        setTimeout(() => { alertContainer.innerHTML = ''; }, 5000);
+    };
+
+    const toggleLoading = (button, isLoading) => {
+        const text = button.querySelector('.button-text');
+        const spinner = button.querySelector('.spinner');
+        button.disabled = isLoading;
+        if (text) text.style.display = isLoading ? 'none' : 'inline';
+        if (spinner) spinner.style.display = isLoading ? 'block' : 'none';
+    };
+
+    const createTableRow = (rate) => {
+        const tr = document.createElement('tr');
+        tr.className = 'bg-white border-b hover:bg-gray-50';
+        tr.innerHTML = `
+            <td class="p-2"><input type="text" class="w-full p-1 border rounded-md" value="${rate.product_keyword_en || ''}" data-field="product_keyword_en"></td>
+            <td class="p-2"><input type="text" class="w-full p-1 border rounded-md" dir="rtl" value="${rate.product_keyword_ar || ''}" data-field="product_keyword_ar"></td>
+            <td class="p-2"><input type="number" step="0.01" class="w-24 p-1 border rounded-md" value="${rate.cost || ''}" data-field="cost"></td>
+            <td class="p-2"><input type="text" class="w-20 p-1 border rounded-md" value="${rate.currency || 'AED'}" data-field="currency"></td>
+            <td class="p-2 text-center"><button class="text-red-500 hover:text-red-700 font-bold text-lg delete-btn">&times;</button></td>
+        `;
+        tr.querySelector('.delete-btn').addEventListener('click', (e) => {
+            e.target.closest('tr').remove();
+        });
+        return tr;
+    };
+
+    const renderTable = (rates) => {
+        const tableBody = document.createElement('tbody');
+        rates.forEach(rate => tableBody.appendChild(createTableRow(rate)));
+        tableContainer.innerHTML = `
+            <table class="w-full text-sm text-right">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                    <tr>
+                        <th class="px-4 py-3">الكلمة المفتاحية (الإنجليزية)</th>
+                        <th class="px-4 py-3">الكلمة المفتاحية (العربية)</th>
+                        <th class="px-4 py-3">التكلفة</th>
+                        <th class="px-4 py-3">العملة</th>
+                        <th class="px-4 py-3 text-center">حذف</th>
+                    </tr>
+                </thead>
+                ${tableBody.outerHTML}
+            </table>
+        `;
+    };
+
+    const fetchShippingRates = async () => {
+        tableContainer.innerHTML = `<div class="flex justify-center items-center p-10"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>`;
+        try {
+            const response = await fetch("{% url 'shipping-rates-api' %}");
+            const data = await response.json();
+            if (!response.ok) throw new Error(data.error || 'فشل جلب البيانات.');
+            renderTable(data);
+        } catch (err) {
+            showAlert(err.message);
+            tableContainer.innerHTML = '<p class="text-center p-4 text-gray-500">لا توجد بيانات لعرضها.</p>';
+        }
+    };
+
+    fileInput.addEventListener('change', () => {
+        analyzeBtn.disabled = !fileInput.files.length;
+    });
+
+    analyzeBtn.addEventListener('click', async () => {
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        toggleLoading(analyzeBtn, true);
+        showAlert('');
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        try {
+            const response = await fetch("{% url 'shipping-rate-analysis-api' %}", {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCsrfToken() },
+                body: formData
+            });
+            const newRates = await response.json();
+            if (!response.ok) throw new Error(newRates.error || 'فشل تحليل الملف.');
+            
+            const tableBody = tableContainer.querySelector('tbody');
+            newRates.reverse().forEach(rate => {
+                tableBody.prepend(createTableRow(rate));
+            });
+            showAlert(`تم تحليل واستخراج ${newRates.length} سعر بنجاح.`, 'success');
+        } catch (err) {
+            showAlert(err.message);
+        } finally {
+            toggleLoading(analyzeBtn, false);
+            fileInput.value = '';
+            analyzeBtn.disabled = true;
+        }
+    });
+
+    saveAllBtn.addEventListener('click', async () => {
+        toggleLoading(saveAllBtn, true);
+        showAlert('');
+
+        const tableRows = tableContainer.querySelectorAll('tbody tr');
+        const ratesToSave = Array.from(tableRows).map(row => ({
+            product_keyword_en: row.querySelector('[data-field="product_keyword_en"]').value,
+            product_keyword_ar: row.querySelector('[data-field="product_keyword_ar"]').value,
+            cost: row.querySelector('[data-field="cost"]').value,
+            currency: row.querySelector('[data-field="currency"]').value,
+        }));
+
+        try {
+            const response = await fetch("{% url 'shipping-rates-api' %}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                body: JSON.stringify({ shipping_rates: ratesToSave })
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.error || 'فشل حفظ البيانات.');
+            
+            showAlert(result.message, 'success');
+            await fetchShippingRates();
+        } catch (err) {
+            showAlert(err.message);
+        } finally {
+            toggleLoading(saveAllBtn, false);
+        }
+    });
+
+    fetchShippingRates();
+});
+</script>
+{% endblock %}

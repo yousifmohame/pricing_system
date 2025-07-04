@@ -1,0 +1,128 @@
+{% extends "management/base.html" %}
+
+{% block title %}إدارة رسوم {{ subscriber.name }}{% endblock %}
+
+{% block content %}
+<div x-data="feesManager({{ subscriber.id }})" x-init="fetchFees()">
+
+    <!-- هذا العنصر الخفي ضروري لتوفير رمز الأمان للـ JavaScript -->
+    <div style="display:none;">{% csrf_token %}</div>
+
+    <!-- قسم العنوان والأزرار الرئيسية -->
+    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800">إدارة الرسوم الإجبارية</h1>
+            <p class="text-lg text-blue-600 font-semibold mt-1">{{ subscriber.name }}</p>
+        </div>
+        <div class="flex space-x-2 space-x-reverse mt-4 sm:mt-0">
+            <button @click="addNewRow" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">+ إضافة رسم جديد</button>
+            <button @click="saveAll" :disabled="isSaving" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-5 rounded-lg flex items-center justify-center w-36">
+                <span x-show="!isSaving">حفظ التغييرات</span>
+                <div x-show="isSaving" class="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+            </button>
+        </div>
+    </div>
+
+    <!-- قسم التنبيهات -->
+    <template x-if="alert.message">
+        <div class="p-4 mb-4 text-sm rounded-lg" :class="{ 'bg-green-100 text-green-700': alert.type === 'success', 'bg-red-100 text-red-700': alert.type === 'error' }" x-text="alert.message"></div>
+    </template>
+
+    <!-- جدول الرسوم -->
+    <div class="bg-white rounded-xl shadow-lg overflow-x-auto">
+        <template x-if="isLoading">
+            <div class="flex justify-center items-center p-10"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>
+        </template>
+        <template x-if="!isLoading">
+            <table class="w-full text-sm text-right text-gray-500">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3">الكلمة المفتاحية للجهاز</th>
+                        <th class="px-6 py-3">الرسم الإجباري</th>
+                        <th class="px-6 py-3">العملة</th>
+                        <th class="px-6 py-3 text-center">حذف</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <template x-for="(fee, index) in fees" :key="index">
+                        <tr class="bg-white border-b hover:bg-gray-50">
+                            <td class="p-2"><input type="text" class="w-full p-2 border rounded-md" placeholder="e.g., iPhone 16 Pro" x-model="fee.device_keyword"></td>
+                            <td class="p-2"><input type="number" step="0.01" class="w-32 p-2 border rounded-md" placeholder="e.g., 50.00" x-model.number="fee.fee"></td>
+                            <td class="p-2"><input type="text" class="w-24 p-2 border rounded-md" placeholder="e.g., AED" x-model="fee.currency"></td>
+                            <td class="p-2 text-center"><button @click="deleteRow(index)" class="text-red-500 hover:text-red-700 font-bold text-xl">&times;</button></td>
+                        </tr>
+                    </template>
+                     {% if not fees %}
+                        <tr><td colspan="4" class="text-center py-10 text-gray-500">لا توجد رسوم معرفة لهذا المشترك. اضغط على "إضافة رسم جديد" للبدء.</td></tr>
+                     {% endif %}
+                </tbody>
+            </table>
+        </template>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function feesManager(subscriberId) {
+        return {
+            subscriberId: subscriberId,
+            fees: [],
+            isLoading: true,
+            isSaving: false,
+            alert: { message: '', type: '' },
+
+            showAlert(message, type = 'success') {
+                this.alert = { message, type };
+                setTimeout(() => this.alert = { message: '', type: '' }, 4000);
+            },
+            getCsrfToken() { return document.querySelector('[name=csrfmiddlewaretoken]').value; },
+
+            async fetchFees() {
+                this.isLoading = true;
+                try {
+                    const response = await fetch(`/api/subscribers/${this.subscriberId}/fees/`);
+                    if (!response.ok) throw new Error('فشل جلب البيانات.');
+                    this.fees = await response.json();
+                } catch (err) {
+                    this.showAlert(err.message, 'error');
+                } finally {
+                    this.isLoading = false;
+                }
+            },
+
+            addNewRow() {
+                this.fees.push({ device_keyword: '', fee: '', currency: 'AED' });
+            },
+
+            deleteRow(index) {
+                this.fees.splice(index, 1);
+            },
+
+            async saveAll() {
+                this.isSaving = true;
+                this.showAlert(''); // Clear previous alerts
+                
+                const validFees = this.fees.filter(f => f.device_keyword && f.fee);
+
+                try {
+                    const response = await fetch(`/api/subscribers/${this.subscriberId}/fees/`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': this.getCsrfToken() },
+                        body: JSON.stringify({ fees: validFees })
+                    });
+                    const result = await response.json();
+                    if (!response.ok) throw new Error(result.error || 'فشل حفظ البيانات.');
+                    
+                    this.showAlert(result.message, 'success');
+                    await this.fetchFees(); // Refresh list from DB
+                } catch (err) {
+                    this.showAlert(err.message, 'error');
+                } finally {
+                    this.isSaving = false;
+                }
+            }
+        }
+    }
+</script>
+{% endblock %}

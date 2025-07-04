@@ -1,0 +1,74 @@
+{% extends "management/base.html" %}
+
+{% block title %}لوحة تحكم العروض{% endblock %}
+
+{% block content %}
+    <div class="bg-white p-6 rounded-xl shadow-lg mb-8">
+        <div class="flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold text-gray-800">لوحة تحكم العروض المحفوظة</h1>
+                <p class="text-gray-600 mt-1">عرض، بحث، وفلترة كل العروض في النظام.</p>
+            </div>
+            <a href="{% url 'analyze-offer' %}" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg whitespace-nowrap">
+                + إضافة عرض جديد
+            </a>
+        </div>
+
+        <!-- قسم البحث والفلترة -->
+        <form method="GET" class="mt-6 border-t pt-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-2">
+                    <label for="search" class="text-sm font-medium text-gray-700">ابحث بالاسم</label>
+                    <input type="text" name="q" id="search" value="{{ search_query }}" placeholder="مثال: iPhone 16 Pro" class="mt-1 w-full p-2 border border-gray-300 rounded-lg">
+                </div>
+                <div>
+                    <label for="supplier_filter" class="text-sm font-medium text-gray-700">فلترة حسب المورد</label>
+                    <select name="supplier" id="supplier_filter" class="mt-1 w-full p-2 border border-gray-300 rounded-lg">
+                        <option value="">كل الموردين</option>
+                        {% for supplier in suppliers %}
+                            <option value="{{ supplier.id }}" {% if supplier.id|stringformat:"s" == selected_supplier %}selected{% endif %}>
+                                {{ supplier.name }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="text-left mt-4">
+                <a href="{% url 'offers-dashboard' %}" class="text-gray-600 mr-4">إعادة تعيين</a>
+                <button type="submit" class="bg-gray-800 text-white py-2 px-5 rounded-lg">تطبيق</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- جدول عرض البيانات -->
+    <div class="bg-white rounded-xl shadow-lg overflow-x-auto">
+        <table class="w-full text-sm text-right text-gray-500">
+            <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                <tr>
+                    <th scope="col" class="px-6 py-3">اسم العرض</th>
+                    <th scope="col" class="px-6 py-3">المورد</th>
+                    <th scope="col" class="px-6 py-3">الماركة</th>
+                    <th scope="col" class="px-6 py-3">السعر الأساسي</th>
+                    <th scope="col" class="px-6 py-3">الكمية</th>
+                    <th scope="col" class="px-6 py-3">تاريخ الإنشاء</th>
+                    <th scope="col" class="px-6 py-3">الإجراءات</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for offer in offers %}
+                    <tr class="bg-white border-b hover:bg-gray-50">
+                        <th scope="row" class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">{{ offer.name }}</th>
+                        <td class="px-6 py-4">{{ offer.supplier.name|default:"-" }}</td>
+                        <td class="px-6 py-4">{{ offer.brand.name|default:"-" }}</td>
+                        <td class="px-6 py-4 font-mono">{{ offer.price }} {{ offer.currency }}</td>
+                        <td class="px-6 py-4">{{ offer.quantity }}</td>
+                        <td class="px-6 py-4">{{ offer.created_at|date:"Y-m-d H:i" }}</td>
+                        <td class="px-6 py-4"><a href="#" class="font-medium text-blue-600 hover:underline">تعديل</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="7" class="text-center py-10 text-gray-500">لم يتم العثور على عروض تطابق بحثك.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% endblock %}

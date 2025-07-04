@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <title>{% block title %}نظام إدارة العروض{% endblock %}</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="//unpkg.com/alpinejs" defer></script>
+    
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+        }
+        @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap');
+    </style>
+</head>
+<body class="bg-gray-100">
+
+    <!-- Responsive Navigation Bar -->
+    <nav class="bg-white shadow-md" x-data="{ isOpen: false }">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div class="flex h-16 items-center justify-between">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0">
+                        <a href="{% url 'analyze-offer' %}" class="text-xl font-bold text-blue-600">نظام التسعير</a>
+                    </div>
+                    <div class="hidden md:block">
+                        <div class="mr-10 flex items-baseline space-x-4 space-x-reverse">
+                            <a href="{% url 'analyze-offer' %}" class="text-gray-700 hover:bg-gray-200 hover:text-black rounded-md px-3 py-2 text-sm font-medium">التحليل والإرسال</a>
+                            <a href="{% url 'send-to-single' %}" class="text-gray-700 hover:bg-gray-200 hover:text-black rounded-md px-3 py-2 text-sm font-medium">عروض مخصصة</a>
+                            <a href="{% url 'offers-dashboard' %}" class="text-gray-700 hover:bg-gray-200 hover:text-black rounded-md px-3 py-2 text-sm font-medium">العروض المحفوظة</a>
+                            <a href="{% url 'subscriber-list' %}" class="text-gray-700 hover:bg-gray-200 hover:text-black rounded-md px-3 py-2 text-sm font-medium">المشتركون</a>
+                            <a href="{% url 'supplier-list' %}" class="text-gray-700 hover:bg-gray-200 hover:text-black rounded-md px-3 py-2 text-sm font-medium">الموردون</a>
+                            
+                            <!-- --- بداية الإصلاح --- -->
+                            <a href="{% url 'shipping-manager' %}" class="text-gray-700 hover:bg-gray-200 hover:text-black rounded-md px-3 py-2 text-sm font-medium">أسعار الشحن</a>
+                            <!-- --- نهاية الإصلاح --- -->
+                            
+                            <a href="{% url 'currency-rate-list' %}" class="text-gray-700 hover:bg-gray-200 hover:text-black rounded-md px-3 py-2 text-sm font-medium">أسعار العملات</a>
+                        </div>
+                    </div>
+                </div>
+                <div class="-mr-2 flex md:hidden">
+                    <!-- Mobile menu button -->
+                    <button @click="isOpen = !isOpen" type="button" class="inline-flex items-center justify-center rounded-md bg-gray-100 p-2 text-gray-600 hover:bg-gray-300 hover:text-black focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-gray-800" aria-controls="mobile-menu" aria-expanded="false">
+                        <span class="sr-only">Open main menu</span>
+                        <svg :class="{'hidden': isOpen, 'block': !isOpen }" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+                        <svg :class="{'block': isOpen, 'hidden': !isOpen }" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mobile menu, show/hide based on menu state. -->
+        <div x-show="isOpen" class="md:hidden" id="mobile-menu">
+            <div class="space-y-1 px-2 pb-3 pt-2 sm:px-3">
+                <a href="{% url 'analyze-offer' %}" class="text-gray-700 hover:bg-gray-200 hover:text-black block rounded-md px-3 py-2 text-base font-medium">التحليل والإرسال</a>
+                <a href="{% url 'send-to-single' %}" class="text-gray-700 hover:bg-gray-200 hover:text-black block rounded-md px-3 py-2 text-base font-medium">عروض مخصصة</a>
+                <a href="{% url 'offers-dashboard' %}" class="text-gray-700 hover:bg-gray-200 hover:text-black block rounded-md px-3 py-2 text-base font-medium">العروض المحفوظة</a>
+                <a href="{% url 'subscriber-list' %}" class="text-gray-700 hover:bg-gray-200 hover:text-black block rounded-md px-3 py-2 text-base font-medium">المشتركون</a>
+                <a href="{% url 'supplier-list' %}" class="text-gray-700 hover:bg-gray-200 hover:text-black block rounded-md px-3 py-2 text-base font-medium">الموردون</a>
+                <a href="{% url 'shipping-manager' %}" class="text-gray-700 hover:bg-gray-200 hover:text-black block rounded-md px-3 py-2 text-base font-medium">أسعار الشحن</a>
+                <a href="{% url 'currency-rate-list' %}" class="text-gray-700 hover:bg-gray-200 hover:text-black block rounded-md px-3 py-2 text-base font-medium">أسعار العملات</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <main>
+        <div class="container mx-auto p-4 md:p-8">
+            {% block content %}
+                <!-- The content of other pages will be injected here -->
+            {% endblock %}
+        </div>
+    </main>
+
+    {% block scripts %}
+    {% endblock %}
+
+</body>
+</html>
